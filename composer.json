@@ -1,0 +1,61 @@
+{
+  "name": "payex-id/multicryptoapi",
+  "description": "Multi crypto API",
+  "type": "library",
+  "require": {
+	"ext-bcmath": "*",
+    "chikiday/bitcoin": "1.1.6",
+    "fguillot/json-rpc": "^1.2.8",
+    "kornrunner/ethereum-token": "^0.1",
+    "kornrunner/ethereum-offline-raw-tx": "^0.6",
+    "kornrunner/ethereum-address": "^0.3",
+    "react/event-loop": "^1.5",
+    "psr/log": "^3.0",
+    "louisemcmahon/pawl": "^0.4.1",
+    "chikiday/tron-api": "dev-master",
+    "chikiday/tron-php": "dev-master"
+  },
+  "require-dev": {
+	"phpunit/phpunit": "9.6.x-dev"
+  },
+  "license": "MIT",
+  "autoload": {
+	"psr-0": {
+	  "Chikiday\\MultiCryptoApi": "src/"
+	}
+  },
+  "authors": [
+	{
+	  "name": "Chikiday",
+	  "email": "mine@mitechno.net"
+	}
+  ],
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "repositories": [
+	{
+	  "type": "vcs",
+	  "url": "https://github.com/chikiday/bitcoin-php.git"
+	},
+	{
+	  "type": "vcs",
+	  "url": "https://github.com/chikiday/tron-api.git"
+	},
+	{
+	  "type": "vcs",
+	  "url": "https://github.com/chikiday/tron-php.git"
+	},
+	{
+	  "type": "vcs",
+	  "url": "https://github.com/chikiday/web3.php.git"
+	},
+	{
+	  "type": "vcs",
+	  "url": "https://github.com/chikiday/phpecc.git"
+	},
+	{
+	  "type": "vcs",
+	  "url": "https://github.com/chikiday/buffertools-php"
+	}
+  ]
+}
