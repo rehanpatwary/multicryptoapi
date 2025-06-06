@@ -5,6 +5,7 @@ namespace Chikiday\MultiCryptoApi\Interface;
 
 use Chikiday\MultiCryptoApi\Blockchain\Address;
 use Chikiday\MultiCryptoApi\Blockchain\AddressCredentials;
+use Chikiday\MultiCryptoApi\Blockchain\Amount;
 use Chikiday\MultiCryptoApi\Blockchain\Transaction;
 
 /**
@@ -18,4 +19,6 @@ interface AddressActivator
 	): Transaction;
 
 	public function isAddressActive(Address|string $address): bool;
+
+	public function getActivationFee(): Amount;
 }
