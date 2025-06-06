@@ -5,10 +5,12 @@ namespace Chikiday\MultiCryptoApi\Api;
 use Chikiday\MultiCryptoApi\Blockbook\TrxBlockbook;
 use Chikiday\MultiCryptoApi\Blockchain\Address as BlockchainAddress;
 use Chikiday\MultiCryptoApi\Blockchain\AddressCredentials;
+use Chikiday\MultiCryptoApi\Blockchain\Amount;
 use Chikiday\MultiCryptoApi\Blockchain\Fee;
 use Chikiday\MultiCryptoApi\Blockchain\Transaction;
 use Chikiday\MultiCryptoApi\Blockchain\TxvInOut;
 use Chikiday\MultiCryptoApi\Exception\IncorrectTxException;
+use Chikiday\MultiCryptoApi\Exception\NotEnoughFundsException;
 use Chikiday\MultiCryptoApi\Interface\AddressActivator;
 use Chikiday\MultiCryptoApi\Interface\ApiClientInterface;
 use Chikiday\MultiCryptoApi\Interface\BlockbookInterface;
@@ -37,6 +39,7 @@ class TronApiClient implements ApiClientInterface, ResourceRentableInterface, Ad
 		if (!isset($this->stream)) {
 			$this->stream = new TronStream($this->blockbook);
 		}
+
 		return $this->stream;
 	}
 
@@ -75,17 +78,83 @@ class TronApiClient implements ApiClientInterface, ResourceRentableInterface, Ad
 
 	public function sendCoins(
 		AddressCredentials $from,
-		string $addressTo,
-		string $amount,
-		?Fee   $fee = null,
+		string             $addressTo,
+		string             $amount,
+		?Fee               $fee = null,
 	): Transaction
 	{
 		$tron = $this->blockbook->tron;
-		$tron->setAddress($from->address);
 		$tron->setPrivateKey($from->privateKey);
 
+		// Получаем детальную информацию об аккаунте отправителя
+		$accountInfo = $tron->getManager()->request('/wallet/getaccount', [
+			'address' => $from->address,
+			'visible' => true,
+		]);
+
+		// Проверяем доступный баланс (не замороженный)
+		$availableBalance = $accountInfo['balance'] ?? 0;
+		$frozenBalance = 0;
+
+		// Учитываем замороженные средства
+		if (isset($accountInfo['frozen'])) {
+			foreach ($accountInfo['frozen'] as $frozen) {
+				$frozenBalance += $frozen['frozen_balance'];
+			}
+		}
+
+		$actualAvailableBalance = $availableBalance - $frozenBalance;
+
+		// Проверяем ресурсы аккаунта
+		$resources = $tron->getManager()->request('/wallet/getaccountresource', [
+			'address' => $from->address,
+			'visible' => true,
+		]);
+
+		$netLimit = ($resources['freeNetLimit'] ?? 0) + ($resources['NetLimit'] ?? 0);
+
+		// Резервируем TRX для комиссий если недостаточно ресурсов
+		$reserveForFees = 0;
+		if ($netLimit < 300) { // Минимальная Bandwidth
+			$reserveForFees += 1000000; // ~1 TRX в SUN
+		}
+
+		// Проверяем активность адреса получателя
+		$activationFee = 0;
 		try {
-			$transfer = $tron->sendTransaction($addressTo, $amount);
+			$recipientInfo = $tron->getManager()->request('/wallet/getaccount', [
+				'address' => $addressTo,
+				'visible' => true,
+			]);
+
+			// Если аккаунт не существует или не активен, нужна активация
+			if (empty($recipientInfo) || !isset($recipientInfo['address'])) {
+				$activationFee = 1100000; // 1.1 TRX в SUN
+			}
+		} catch (TronException $e) {
+			// Если не удалось получить информацию об адресе, считаем что он неактивен
+			$activationFee = 1100000; // 1.1 TRX в SUN
+		}
+
+		$requiredAmount = $tron->toTron($amount) + $reserveForFees + $activationFee;
+
+		if ($actualAvailableBalance < $requiredAmount) {
+			$errorMessage = "Not enough funds. Available: " . ($actualAvailableBalance / 1000000) . " TRX, " .
+				"Required: " . ($requiredAmount / 1000000) . " TRX";
+
+			if ($activationFee > 0) {
+				$errorMessage .= " (including activation fee: " . ($activationFee / 1000000) . " TRX)";
+			}
+
+			if ($reserveForFees > 0) {
+				$errorMessage .= " (including reserves for fees: " . ($reserveForFees / 1000000) . " TRX)";
+			}
+
+			throw new NotEnoughFundsException($errorMessage);
+		}
+
+		try {
+			$transfer = $tron->sendTransaction($addressTo, $amount, $from->address);
 		} catch (TronException $e) {
 			throw new IncorrectTxException($e->getMessage(), $e->getCode(), $e);
 		}
@@ -114,11 +183,11 @@ class TronApiClient implements ApiClientInterface, ResourceRentableInterface, Ad
 
 	public function sendAsset(
 		AddressCredentials $from,
-		string $assetId,
-		string $addressTo,
-		string $amount,
-		?int   $decimals = null,
-		?Fee   $fee = null,
+		string             $assetId,
+		string             $addressTo,
+		string             $amount,
+		?int               $decimals = null,
+		?Fee               $fee = null,
 	): Transaction
 	{
 		$tron = $this->blockbook->tron;
@@ -160,19 +229,19 @@ class TronApiClient implements ApiClientInterface, ResourceRentableInterface, Ad
 
 	public function delegateResource(
 		AddressCredentials $from,
-		string $type,
-		string $addressTo,
-		int    $amount,
+		string             $type,
+		string             $addressTo,
+		int                $amount,
 	): Transaction
 	{
 		$tron = $this->blockbook->tron;
 		$tron->setPrivateKey($from->privateKey);
 
 		try {
-			$unsignedTx = $this->blockbook->tron->getManager()->request('/wallet/delegateresource', [
+			$unsignedTx = $tron->getManager()->request('/wallet/delegateresource', [
 				'owner_address'    => $from->address,
 				'receiver_address' => $addressTo,
-				'balance'          => $this->blockbook()->tron->toTron($amount),
+				'balance'          => $tron->toTron($amount),
 				'resource'         => strtoupper($type),
 				'lock'             => false,
 				'visible'          => true,
@@ -194,9 +263,9 @@ class TronApiClient implements ApiClientInterface, ResourceRentableInterface, Ad
 
 	public function cancelDelegateResource(
 		AddressCredentials $from,
-		string $type,
-		string $addressTo,
-		int    $amount,
+		string             $type,
+		string             $addressTo,
+		int                $amount,
 	): Transaction
 	{
 		$tron = $this->blockbook->tron;
@@ -269,15 +338,39 @@ class TronApiClient implements ApiClientInterface, ResourceRentableInterface, Ad
 
 	public function isAddressActive(string|BlockchainAddress $address): bool
 	{
-		if (!$address instanceof BlockchainAddress) {
-			$address = $this->blockbook->getAddress($address);
+		if ($address instanceof BlockchainAddress) {
+			return $address->originData['details']['isActive'];
 		}
 
-		return $address->originData['details']['isActive'];
+		return $this->isAddressActiveByApi($address);
+	}
+
+	public function getActivationFee(): Amount
+	{
+		return Amount::value(1.1, $this->blockbook->getDecimals());
 	}
 
 	public function validateAddress(string $address): bool
 	{
 		return $this->blockbook->tron->isAddress($address);
+	}
+
+	/**
+	 * Проверяет активность адреса через прямой запрос к TRON API
+	 */
+	private function isAddressActiveByApi(string $address): bool
+	{
+		try {
+			$accountInfo = $this->blockbook->tron->getManager()->request('/wallet/getaccount', [
+				'address' => $address,
+				'visible' => true,
+			]);
+
+			// Адрес считается активным если существует в сети
+			return !empty($accountInfo) && isset($accountInfo['address']);
+		} catch (TronException $e) {
+			// Если не удалось получить информацию, считаем адрес неактивным
+			return false;
+		}
 	}
 }
