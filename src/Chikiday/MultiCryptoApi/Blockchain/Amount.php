@@ -45,6 +45,13 @@ class Amount implements JsonSerializable
 		return $amount;
 	}
 
+	public function sub(Amount $amount): Amount
+	{
+		$this->satoshi = bcsub($this->satoshi, $amount->satoshi, $this->decimals);
+
+		return $this;
+	}
+
 	public function mul(float $multiply): Amount
 	{
 		$this->satoshi = bcmul($this->satoshi, (string) $multiply, $this->decimals);
