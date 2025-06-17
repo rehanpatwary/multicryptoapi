@@ -189,7 +189,7 @@ abstract class BlockbookAbstract implements BlockbookInterface, BlockchainDataRe
 		return new Block(
 			$data['height'],
 			$data['hash'],
-			array_column($data['txs'], 'txid'),
+			array_column($data['txs'] ?? [], 'txid'),
 			$data['previousBlockHash'],
 			$data,
 		);
