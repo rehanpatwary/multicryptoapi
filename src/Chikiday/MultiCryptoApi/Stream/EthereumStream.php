@@ -43,6 +43,12 @@ class EthereumStream extends AbstractStream
 		return $this;
 	}
 
+	public function setStaleTimeout(int $staleTimeout): self
+	{
+		$this->staleTimeout = $staleTimeout;
+		return $this;
+	}
+
 	protected function sub(): void
 	{
 		$this->lastMessageTime = 0;

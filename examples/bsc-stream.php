@@ -56,7 +56,9 @@ $blocks = 0;
 $eth->subscribeToAnyBlock(function (IncomingBlock $block) use(&$blocks, $time) {
 	$blocks ++ ;
 	$_time = time() - $time;
-	echo "New block {$block->blockNumber} mined, " . count($block->txs) . " txs [{$blocks} blocks | {$_time} s.]\n";
+	$mem = round(memory_get_usage() / 1024 / 1024, 2);
+	echo "New block {$block->blockNumber} mined, " . count($block->txs) . " " .
+		"txs [{$blocks} blocks | {$_time} s. | {$mem} mb.]\n";
 
 	foreach ($block->txs as $tx) {
 //		echo "Tx {$tx->txid} {$tx->from} -> {$tx->to} {$tx->amount} {$tx->contractAddress}\n";

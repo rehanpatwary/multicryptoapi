@@ -20,10 +20,10 @@ $blockbook = new EthereumBlockbook(
 			'api-key' => $keys['NowNodes'],
 		]
 	),
-	'wss://mainnet.infura.io/ws/v3/' . $keys['Infura']
+//	'wss://mainnet.infura.io/ws/v3/' . $keys['Infura']
 );
 
-$blockbook->debug = true;
+$blockbook->debug = false;
 
 class StringCounter
 {
@@ -41,13 +41,18 @@ class StringCounter
 $counter = new StringCounter();
 
 $eth = new EthereumStream($blockbook);
+$eth->setStaleTimeout(20);
 $eth->debug = true;
 
-$eth->subscribeToAnyBlock(function (IncomingBlock $block) {
-	echo "Block {$block->blockNumber} mined, " . count($block->txs) . " txs\n";
-//	foreach ($block->txs as $tx) {
-//		echo "Tx {$tx->txid} {$tx->from} -> {$tx->to} {$tx->amount} {$tx->contractAddress}\n";
-//	}
+$time = time();
+$blocks = 0;
+
+$eth->subscribeToAnyBlock(function (IncomingBlock $block) use(&$blocks, $time) {
+	$blocks ++ ;
+	$_time = time() - $time;
+	$mem = round(memory_get_usage() / 1024 / 1024, 2);
+	echo "New block {$block->blockNumber} mined, " . count($block->txs) . " " .
+		"txs [{$blocks} blocks | {$_time} s. | {$mem} mb.]\n";
 });
 
 //$i = 0;
