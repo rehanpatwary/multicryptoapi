@@ -6,6 +6,7 @@ require_once __DIR__ . "/../vendor/autoload.php";
 
 use Chikiday\MultiCryptoApi\Blockbook\EthereumBlockbook;
 use Chikiday\MultiCryptoApi\Blockchain\RpcCredentials;
+use Chikiday\MultiCryptoApi\Log\StdoutLogger;
 use Chikiday\MultiCryptoApi\Model\IncomingBlock;
 use Chikiday\MultiCryptoApi\Model\IncomingTransaction;
 use Chikiday\MultiCryptoApi\Stream\EthereumStream;
@@ -20,7 +21,8 @@ $blockbook = new EthereumBlockbook(
 			'api-key' => $keys['NowNodes']
 		]
 	),
-	'wss://bsc-mainnet.infura.io/ws/v3/' . $keys['Infura'],
+//	'wss://bsc-mainnet.infura.io/ws/v3/' . $keys['Infura'],
+	null,
 	56
 );
 
@@ -43,10 +45,19 @@ class StringCounter
 $counter = new StringCounter();
 
 $eth = new EthereumStream($blockbook);
-$eth->debug = true;
+$logger = new StdoutLogger();
+$eth->setLogger($logger);
 
-$eth->subscribeToAnyBlock(function (IncomingBlock $block) {
-	echo "New block {$block->blockNumber} mined, " . count($block->txs) . " txs\n";
+$eth->debug = false;
+
+$time = time();
+$blocks = 0;
+
+$eth->subscribeToAnyBlock(function (IncomingBlock $block) use(&$blocks, $time) {
+	$blocks ++ ;
+	$_time = time() - $time;
+	echo "New block {$block->blockNumber} mined, " . count($block->txs) . " txs [{$blocks} blocks | {$_time} s.]\n";
+
 	foreach ($block->txs as $tx) {
 //		echo "Tx {$tx->txid} {$tx->from} -> {$tx->to} {$tx->amount} {$tx->contractAddress}\n";
 	}

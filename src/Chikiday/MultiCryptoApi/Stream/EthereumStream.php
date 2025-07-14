@@ -28,7 +28,7 @@ class EthereumStream extends AbstractStream
 	private array $callbacks;
 	private WebSocket $conn;
 	private float $lastMessageTime;
-	private int $staleTimeout = 120;
+	private int $staleTimeout = 3;
 	private TimerInterface $timerId;
 
 	public function __construct(public readonly EthereumBlockbook $blockbook)
@@ -38,22 +38,15 @@ class EthereumStream extends AbstractStream
 	public function cancelSubscriptions(): StreamableInterface
 	{
 		$this->getLoop()->cancelTimer($this->timerId);
-		$this->getLoop()->stop();
+//		$this->getLoop()->stop();
 
 		return $this;
 	}
 
 	protected function sub(): void
 	{
-		$this->lastMessageTime = microtime(true);
-
+		$this->lastMessageTime = 0;
 		$loop = $this->getLoop();
-		$this->timerId = $loop->addPeriodicTimer(1, function () {
-			if ($this->isStale()) {
-				$this->stop();
-			}
-		});
-
 		connect($this->resolveStreamUri(), [], [], $loop)->then(function (WebSocket $conn) {
 			$this->conn = $conn;
 
@@ -63,6 +56,8 @@ class EthereumStream extends AbstractStream
 
 			$this->subscribeToBlocks();
 //			$this->subscribeToLogs();
+
+			$this->lastMessageTime = microtime(true);
 		}, function ($e) {
 			throw new MultiCryptoApiException("Could not connect: {$e->getMessage()}");
 		});
@@ -93,12 +88,19 @@ class EthereumStream extends AbstractStream
 
 	protected function start(): void
 	{
-		if (isset($this->started)) {
+		if ($this->started ?? false) {
 			// already started
 			return;
 		}
 
 		$this->started = true;
+		$loop = $this->getLoop();
+		$this->timerId = $loop->addPeriodicTimer(1, function () {
+			if ($this->isStale()) {
+				$this->stop();
+				$this->start();
+			}
+		});
 		$this->sub();
 	}
 
@@ -156,7 +158,7 @@ class EthereumStream extends AbstractStream
 
 		$id = $json['id'] ?? $json['params']['subscription'];
 
-		if (!$cb = $this->callbacks[$id]) {
+		if (!$cb = $this->callbacks[$id] ?? null) {
 			throw new MultiCryptoApiException("Unknown response: {$message}");
 		}
 
@@ -176,7 +178,7 @@ class EthereumStream extends AbstractStream
 		$blockNumber = hexdec($data['number']);
 		$block = new IncomingBlock($blockNumber, $data['hash'], $data['parentHash'], []);
 
-		$this->debug("Block {$blockNumber} received, loading txs...");
+//		$this->debug("Block {$blockNumber} received, loading txs...");
 
 		$this->loadBlockTxes($block, function (array $txes) use ($block) {
 			$block->txs = $txes;
@@ -193,15 +195,14 @@ class EthereumStream extends AbstractStream
 			function ($data) use ($uncompletedBlock, $try, $callback, $time) {
 				$blockLoadTime = microtime(true) - $time;
 				if (empty($data['result'] ?? null)) {
-					$this->info(
-						"Block {$uncompletedBlock->blockNumber} {$blockLoadTime} #{$try} fail load txs"
-					);
+					$msg = "Block {$uncompletedBlock->blockNumber} {$blockLoadTime} #{$try} fail load txs";
+//					$this->info($msg);
 					$this->loadBlockTxes($uncompletedBlock, $callback, $try + 1);
 					return;
 				}
 
 				$size = strlen(serialize($data)) / 1024;
-				$this->info("Block {$uncompletedBlock->blockNumber} {$blockLoadTime} tx loading time (size {$size} kb.)");
+//				$this->info("Block {$uncompletedBlock->blockNumber} {$blockLoadTime} tx loading time (size {$size} kb.)");
 
 				$time = microtime(true);
 
@@ -221,7 +222,7 @@ class EthereumStream extends AbstractStream
 				$callback($txs);
 
 				$time = microtime(true) - $time;
-				$this->debug("Block {$uncompletedBlock->blockNumber} {$txPreparedTime} prep / callback {$time}");
+//				$this->debug("Block {$uncompletedBlock->blockNumber} {$txPreparedTime} prep / callback {$time}");
 			},
 			true
 		);
@@ -351,13 +352,19 @@ class EthereumStream extends AbstractStream
 
 	private function isStale(): bool
 	{
+		if (!$this->lastMessageTime) {
+			return false;
+		}
 		$currentTime = microtime(true);
 		return $currentTime - $this->lastMessageTime > $this->staleTimeout;
 	}
 
 	private function stop(): void
 	{
+		$this->info(" *** RECONNECT ***");
 		$this->info("Stale connection detected, stopping process...");
 		$this->cancelSubscriptions();
+		$this->started = false;
+//		$this->callbacks = [];
 	}
 }
