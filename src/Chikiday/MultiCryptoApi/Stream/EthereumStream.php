@@ -51,7 +51,7 @@ class EthereumStream extends AbstractStream
 
 	protected function sub(): void
 	{
-		$this->lastMessageTime = 0;
+		$this->lastMessageTime = microtime(true);
 		$loop = $this->getLoop();
 		connect($this->resolveStreamUri(), [], [], $loop)->then(function (WebSocket $conn) {
 			$this->conn = $conn;
