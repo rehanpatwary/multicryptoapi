@@ -30,6 +30,7 @@ class EthereumStream extends AbstractStream
 	private float $lastMessageTime;
 	private int $staleTimeout = 3;
 	private TimerInterface $timerId;
+	private array $subscriptions = [];
 
 	public function __construct(public readonly EthereumBlockbook $blockbook)
 	{
@@ -38,7 +39,9 @@ class EthereumStream extends AbstractStream
 	public function cancelSubscriptions(): StreamableInterface
 	{
 		$this->getLoop()->cancelTimer($this->timerId);
-//		$this->getLoop()->stop();
+		foreach ($this->subscriptions as $id) {
+			$this->unsubscribe($id);
+		}
 
 		return $this;
 	}
@@ -131,8 +134,36 @@ class EthereumStream extends AbstractStream
 					json_encode($params),
 				];
 
+				$this->subscriptions[] = $result['result'];
+
 				$this->debug("Subscribed to " . json_encode($params) . " with id: " . $result['result']);
 				$this->debug("Callbacks now: " . implode(', ', array_keys($this->callbacks)));
+			},
+			true
+		);
+	}
+
+	protected function unsubscribe(string $id): void
+	{
+		if (!isset($this->callbacks[$id])) {
+			return;
+		}
+
+		unset($this->subscriptions[$id]);
+
+		$this->callMethod(
+			'eth_unsubscribe',
+			[$id],
+			function ($result) use ($id) {
+				if (isset($result['error'])) {
+					$errorText = "Unsubscribe '{$id}' error: {$result['error']['message']}";
+					$this->debug($errorText);
+				} else {
+					if (isset($this->callbacks[$id])) {
+						unset($this->callbacks[$id]);
+					}
+					$this->debug("Unsubscribed {$id}");
+				}
 			},
 			true
 		);
@@ -162,8 +193,7 @@ class EthereumStream extends AbstractStream
 //		$this->debug("New msg: " . mb_substr($message, 0, 120));
 		$json = json_decode($message, true);
 
-		$id = $json['id'] ?? $json['params']['subscription'];
-
+		$id = $json['id'] ?? $json['params']['subscription'] ?? null;
 		if (!$cb = $this->callbacks[$id] ?? null) {
 			throw new MultiCryptoApiException("Unknown response: {$message}");
 		}
@@ -367,8 +397,7 @@ class EthereumStream extends AbstractStream
 
 	private function stop(): void
 	{
-		$this->info(" *** RECONNECT ***");
-		$this->info("Stale connection detected, stopping process...");
+		$this->info("*** RECONNECT ***: Stale connection detected, stopping process...");
 		$this->cancelSubscriptions();
 		$this->started = false;
 //		$this->callbacks = [];
