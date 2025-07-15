@@ -247,11 +247,11 @@ abstract class BlockbookAbstract implements BlockbookInterface, BlockchainDataRe
 		try {
 			$response = $this->http()->get($uri);
 		} catch (GuzzleException $e) {
-			if (!str_contains(strtolower($e->getMessage()), 'block not found') || $try > 3) {
+			if (!str_contains(strtolower($e->getMessage()), 'block not found') || $try > 5) {
 				throw $e;
 			}
 
-			sleep(1);
+			usleep(100_000);
 
 			return $this->loadBlock($hash, ++$try);
 		}
