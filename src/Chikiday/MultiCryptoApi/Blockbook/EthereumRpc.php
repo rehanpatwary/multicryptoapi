@@ -97,7 +97,7 @@ class EthereumRpc extends EthereumBlockbook
 					"0",
 					hexdec($data['transactionIndex']),
 					$_assets = [
-						$token->toAsset($transferByLog->value),
+						$token->toAssetByLog($transferByLog),
 					],
 					$log
 				);
@@ -242,7 +242,7 @@ class EthereumRpc extends EthereumBlockbook
 
 		$txs = [];
 		foreach ($data as $tx) {
-			$asset = $tokenInfo->toAsset($tx['value']);
+			$asset = $tokenInfo->toAsset($tx['value'], $tx['from'], $tx['to']);
 
 			$txs[] = new Transaction(
 				$tx['hash'],

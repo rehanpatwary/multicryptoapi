@@ -41,7 +41,16 @@ readonly class TokenInfo implements \JsonSerializable
 		];
 	}
 
-	public function toAsset(string $amount): Asset
+	public function toAssetByLog(EthTransferLog $log): Asset
+	{
+		return $this->toAsset(
+			$log->value,
+			$log->to,
+			$log->from
+		);
+	}
+
+	public function toAsset(string $amount, string $from, string $to): Asset
 	{
 		return new Asset(
 			$this->type,
@@ -49,6 +58,10 @@ readonly class TokenInfo implements \JsonSerializable
 			Amount::satoshi($amount, $this->decimals),
 			$this->name,
 			$this->symbol,
+			[
+				'from' => $from,
+				'to'   => $to,
+			]
 		);
 	}
 }
