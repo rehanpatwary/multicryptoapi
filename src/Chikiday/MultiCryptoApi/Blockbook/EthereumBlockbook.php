@@ -98,7 +98,7 @@ class EthereumBlockbook extends BlockbookAbstract implements TokenAwareInterface
 	protected function jsonRpcWithRetry(string $method, array $params = [], int $retries = 5): mixed
 	{
 		$try = 0;
-		while (!$data = $this->jsonRpc($method, $params)) {
+		while (is_null($data = $this->jsonRpc($method, $params))) {
 			if (++$try >= $retries) {
 				throw new MultiCryptoApiException("JSON RPC CALL '{$method}' returned null more than {$retries} retries");
 			}

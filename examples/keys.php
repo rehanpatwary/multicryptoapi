@@ -32,4 +32,5 @@ return [
 	'TronScan' => getenv('TRONSCAN_API_KEY'),
 	'Infura' => getenv('INFURA_API_KEY'),
 	'TronGridApiKey' => getenv('TRONGRID_API_KEY'),
+	'Etherscan' => getenv('ETHERSCAN_API_KEY'),
 ];

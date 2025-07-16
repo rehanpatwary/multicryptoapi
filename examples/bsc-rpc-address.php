@@ -4,12 +4,12 @@ error_reporting(E_ALL ^ E_DEPRECATED);
 
 require_once __DIR__ . "/../vendor/autoload.php";
 
-use Chikiday\MultiCryptoApi\Blockbook\EthereumRpcBlockbook;
+use Chikiday\MultiCryptoApi\Blockbook\EthereumRpc;
 use Chikiday\MultiCryptoApi\Blockchain\RpcCredentials;
 
 $keys = include_once __DIR__ . '/keys.php';
 
-$blockbook = new EthereumRpcBlockbook(
+$blockbook = new EthereumRpc(
 	new RpcCredentials(
 		'https://bsc.nownodes.io/' . $keys['NowNodes'],
 		'https://bsc-blockbook.nownodes.io',
@@ -28,7 +28,7 @@ $blockbook = new EthereumRpcBlockbook(
 );
 
 $time = microtime(true);
-$address = $blockbook->getAddressTransactions("0xcbf593bfb22aa8b4dc561616b2d10dbe0dbe0666", true);
+$address = $blockbook->getAddress("0xcbf593bfb22aa8b4dc561616b2d10dbe0dbe0666", true);
 $time = microtime(true) - $time;
 
 echo "Address: " . $address->address . " has balance {$address->balance->toBtc()} an assets:\n";

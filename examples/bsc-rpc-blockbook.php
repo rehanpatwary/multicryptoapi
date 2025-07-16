@@ -4,12 +4,12 @@ error_reporting(E_ALL ^ E_DEPRECATED);
 
 require_once __DIR__ . "/../vendor/autoload.php";
 
-use Chikiday\MultiCryptoApi\Blockbook\EthereumRpcBlockbook;
+use Chikiday\MultiCryptoApi\Blockbook\EthereumRpc;
 use Chikiday\MultiCryptoApi\Blockchain\RpcCredentials;
 
 $keys = include_once __DIR__ . '/keys.php';
 
-$blockbook = new EthereumRpcBlockbook(
+$blockbook = new EthereumRpc(
 	new RpcCredentials(
 		'https://bsc.nownodes.io/' . $keys['NowNodes'],
 		'https://bsc-blockbook.nownodes.io',
@@ -27,10 +27,10 @@ $blockbook = new EthereumRpcBlockbook(
 
 );
 
-//$block = $blockbook->getBlock('52069123');
-//echo "Last block number: {$block->height} hash {$block->hash}, ".count($block->txids)." txs\n";
+$block = $blockbook->getBlock('52069123');
+echo "Last block number: {$block->height} hash {$block->hash}, ".count($block->txids)." txs\n";
 
-$tx = $blockbook->getTx("0xf681c1ba205f1b0e325277578e6d6d75d2af993d158b32fcbba9be5aa2505723");
+$tx = $blockbook->getTx($block->txids[0]);
 if (!$tx->isSuccess) {
 	echo "*** WARNING *** Transaction is not successful! \n";
 }

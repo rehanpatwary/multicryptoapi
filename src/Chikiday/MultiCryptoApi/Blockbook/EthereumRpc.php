@@ -11,6 +11,7 @@ use Chikiday\MultiCryptoApi\Blockchain\RpcCredentials;
 use Chikiday\MultiCryptoApi\Blockchain\Transaction;
 use Chikiday\MultiCryptoApi\Blockchain\TransactionList;
 use Chikiday\MultiCryptoApi\Blockchain\TxvInOut;
+use Chikiday\MultiCryptoApi\Exception\MultiCryptoApiException;
 use Chikiday\MultiCryptoApi\Model\TokenInfo;
 use Chikiday\MultiCryptoApi\Util\EthUtil;
 use Override;
@@ -18,7 +19,7 @@ use Override;
 /**
  * @property  ?RpcCredentials $credentials
  */
-class EthereumRpcBlockbook extends EthereumBlockbook
+class EthereumRpc extends EthereumBlockbook
 {
 	protected ?array $allowedTokens = null;
 
@@ -28,6 +29,26 @@ class EthereumRpcBlockbook extends EthereumBlockbook
 		int    $pageSize = 1000,
 	): TransactionList
 	{
+		// here we use Etherscan api to avoid hell with eth_getLogs rpc
+		$address = strtolower($address);
+
+		$tokens = $this->getAllowedTokens();
+		$list = [];
+		foreach ($tokens as $token) {
+			$list = array_merge($list, $this->getErc20Txs($token, $address, $page, $pageSize));
+		}
+
+		$list = array_merge($list, $this->getNormalAddressTxs($address, $page, $pageSize));
+
+		usort($list, function ($a, $b) {
+			return $b->blockNumber <=> $a->blockNumber;
+		});
+
+		return new TransactionList(
+			$list,
+			$page,
+			count($list) == $pageSize ? $page + 1 : $page
+		);
 	}
 
 	#[Override] public function getBlock(string $hash = 'latest'): Block
@@ -123,7 +144,6 @@ class EthereumRpcBlockbook extends EthereumBlockbook
 		);
 	}
 
-
 	#[Override] public function getAddress(string $address, bool $loadAssets = false): Address
 	{
 		$data = $this->jsonRpc('eth_getBalance', [$address, 'latest']);
@@ -160,19 +180,28 @@ class EthereumRpcBlockbook extends EthereumBlockbook
 		return [];
 	}
 
-	public function getDecimals(): int
+	protected function etherscanApiQuery(array $params): array
 	{
-		return 18;
-	}
+		if (!$token = $this->getOption('etherscanApiKey')) {
+			throw new MultiCryptoApiException("EtherscanApiKey is required");
+		}
 
-	public function getName(): string
-	{
-		return "BNB";
-	}
+		$params = array_merge([
+			'chainId' => $this->chainId,
+			'apikey'  => $token,
+		], $params);
 
-	public function getSymbol(): string
-	{
-		return "BNB";
+		$url = "https://api.etherscan.io/v2/api?" . http_build_query($params);
+
+		$response = $this->http()->get($url)->getBody()->getContents();
+
+		$data = json_decode($response, true);
+
+		if ($data['status'] == 1) {
+			return $data['result'] ?? [];
+		}
+
+		throw new \Exception("Etherscan API error: " . $data['message']);
 	}
 
 	/**
@@ -185,6 +214,9 @@ class EthereumRpcBlockbook extends EthereumBlockbook
 		}
 
 		$tokens = $this->getOption('tokens') ?? [];
+		if (empty($tokens)) {
+			throw new MultiCryptoApiException("tokens is not configured");
+		}
 		$_assets = [];
 		foreach ($tokens as $token) {
 			$info = $this->getTokenInfo($token);
@@ -192,5 +224,100 @@ class EthereumRpcBlockbook extends EthereumBlockbook
 		}
 
 		return $this->allowedTokens = $_assets;
+	}
+
+	private function getErc20Txs(TokenInfo $tokenInfo, string $address, int $page, int $pageSize): array
+	{
+		$data = $this->etherscanApiQuery([
+			'module'          => 'account',
+			'action'          => 'tokentx',
+			'contractaddress' => $tokenInfo->contract,
+			'address'         => $address,
+			'page'            => $page,
+			'offset'          => $pageSize,
+			'startblock'      => 0,
+			'endblock'        => 'latest',
+			'sort'            => 'desc',
+		]);
+
+		$txs = [];
+		foreach ($data as $tx) {
+			$asset = $tokenInfo->toAsset($tx['value']);
+
+			$txs[] = new Transaction(
+				$tx['hash'],
+				$tx['blockNumber'],
+				$tx['confirmations'],
+				$tx['timeStamp'],
+				[
+					new TxvInOut(
+						$tx['from'],
+						"0",
+						$tx['transactionIndex'],
+						[$asset],
+					),
+				],
+				[
+					new TxvInOut(
+						$tx['to'],
+						"0",
+						$tx['transactionIndex'],
+						[$asset],
+					),
+				],
+				"0",
+				$tx
+			);
+		}
+
+		return $txs;
+	}
+
+	private function getNormalAddressTxs(string $address, int $page, int $pageSize): array
+	{
+		$data = $this->etherscanApiQuery([
+			'module'     => 'account',
+			'action'     => 'txlist',
+			'address'    => $address,
+			'page'       => $page,
+			'offset'     => $pageSize,
+			'startblock' => 0,
+			'endblock'   => 'latest',
+			'sort'       => 'desc',
+		]);
+
+		$txs = [];
+		foreach ($data as $tx) {
+			if (!empty($tx['functionName'])) {
+				continue;
+			}
+			$amount = Amount::satoshi($tx['value'], $this->getDecimals());
+
+			$txs[] = new Transaction(
+				$tx['hash'],
+				$tx['blockNumber'],
+				$tx['confirmations'],
+				$tx['timeStamp'],
+				[
+					new TxvInOut(
+						$tx['from'],
+						$amount,
+						$tx['transactionIndex'],
+					),
+				],
+				[
+					new TxvInOut(
+						$tx['to'],
+						$amount,
+						$tx['transactionIndex'],
+					),
+				],
+				"0",
+				$tx,
+				!$tx['isError']
+			);
+		}
+
+		return $txs;
 	}
 }
