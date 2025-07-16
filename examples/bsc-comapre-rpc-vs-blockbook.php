@@ -42,14 +42,18 @@ $blockbook = new EthereumBlockbook(
 );
 
 
+$address = '0xcbF593BfB22aa8B4dc561616b2D10dbe0DbE0666';
 try {
 	$time = microtime(true);
-	$list = $rpc->getAddressTransactions('0xcbF593BfB22aa8B4dc561616b2D10dbe0DbE0666');
+	$list = $rpc->getAddressTransactions($address);
 	$time = round(microtime(true) - $time, 5);
 	echo "Loaded ". count($list->transactions) ." txs from RPC api, for {$time} seconds.\n";
 
 	foreach ($list->transactions as $transaction) {
 		echo "TX {$transaction->txid}\n";
+		foreach ($transaction->getRelatedTransactions($address) as $relatedTransaction) {
+			echo "$relatedTransaction->from -> {$relatedTransaction->amount}\n";
+		}
 	}
 } catch (\Exception $e) {
 	echo "Cant load txs by RPC: {$e->getMessage()}\n";
@@ -57,7 +61,7 @@ try {
 
 try {
 	$time = microtime(true);
-	$list = $blockbook->getAddressTransactions('0xcbF593BfB22aa8B4dc561616b2D10dbe0DbE0666');
+	$list = $blockbook->getAddressTransactions($address);
 	$time = round(microtime(true) - $time, 5);
 	echo "Loaded ". count($list->transactions) ." txs from Blockbook api, for {$time} seconds.\n";
 	foreach ($list->transactions as $transaction) {

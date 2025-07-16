@@ -252,7 +252,7 @@ class EthereumRpc extends EthereumBlockbook
 				[
 					new TxvInOut(
 						$tx['from'],
-						"0",
+						Amount::satoshi("0", $this->getDecimals()),
 						$tx['transactionIndex'],
 						[$asset],
 					),
@@ -260,7 +260,7 @@ class EthereumRpc extends EthereumBlockbook
 				[
 					new TxvInOut(
 						$tx['to'],
-						"0",
+						Amount::satoshi("0", $this->getDecimals()),
 						$tx['transactionIndex'],
 						[$asset],
 					),
