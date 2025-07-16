@@ -2,6 +2,9 @@
 
 namespace Chikiday\MultiCryptoApi\Model;
 
+use Chikiday\MultiCryptoApi\Blockchain\Amount;
+use Chikiday\MultiCryptoApi\Blockchain\Asset;
+
 readonly class TokenInfo implements \JsonSerializable
 {
 	public function __construct(
@@ -36,5 +39,16 @@ readonly class TokenInfo implements \JsonSerializable
 			'decimals' => $this->decimals,
 			'type'     => $this->type,
 		];
+	}
+
+	public function toAsset(string $amount): Asset
+	{
+		return new Asset(
+			$this->type,
+			$this->contract,
+			Amount::satoshi($amount, $this->decimals),
+			$this->name,
+			$this->symbol,
+		);
 	}
 }

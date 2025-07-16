@@ -32,13 +32,15 @@ abstract class BlockbookAbstract implements BlockbookInterface, BlockchainDataRe
 	protected string $name = "Bitcoin";
 	protected string $symbol = "BTC";
 
+	protected array $options = [];
 	protected Throttler $throttler;
 
 	public function __construct(
 		protected RpcCredentials $credentials,
-		protected                         $options = [],
+		array $options = []
 	)
 	{
+		$this->options = $options;
 	}
 
 	public function getOption(string $key): mixed

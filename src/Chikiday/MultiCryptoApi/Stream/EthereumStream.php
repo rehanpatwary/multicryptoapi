@@ -10,6 +10,7 @@ use Chikiday\MultiCryptoApi\Interface\StreamableInterface;
 use Chikiday\MultiCryptoApi\Model\IncomingBlock;
 use Chikiday\MultiCryptoApi\Model\IncomingTransaction;
 use Chikiday\MultiCryptoApi\Stream\Abstract\AbstractStream;
+use Chikiday\MultiCryptoApi\Util\EthUtil;
 use Closure;
 use kornrunner\Ethereum\Contract;
 use Ratchet\Client\WebSocket;
@@ -31,9 +32,11 @@ class EthereumStream extends AbstractStream
 	private int $staleTimeout = 3;
 	private TimerInterface $timerId;
 	private array $subscriptions = [];
+	protected EthUtil $util;
 
 	public function __construct(public readonly EthereumBlockbook $blockbook)
 	{
+		$this->util = new EthUtil();
 	}
 
 	public function cancelSubscriptions(): StreamableInterface
@@ -331,13 +334,12 @@ class EthereumStream extends AbstractStream
 			);
 		}
 
-		if (str_starts_with($tx['input'], "0x" . Contract::SIGNATURE_TRANSFER)) {
-			$parsedEthInput = $this->parseEthInput($tx['input']);
-			$amount = Amount::satoshi($parsedEthInput['value'], 18);
+		if ($input = $this->util->getTransferByInput($tx['input'])) {
+			$amount = Amount::satoshi($input->value, 18);
 			$txs[] = new IncomingTransaction(
 				$tx['hash'],
 				$tx['from'],
-				"0x" . $parsedEthInput['to'],
+				$input->to,
 				$amount,
 				hexdec($tx['blockNumber']),
 				$tx['to'],
