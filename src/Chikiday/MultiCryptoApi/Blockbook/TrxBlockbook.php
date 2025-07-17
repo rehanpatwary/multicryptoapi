@@ -295,4 +295,9 @@ class TrxBlockbook extends BlockbookAbstract implements UnconfirmedBalanceFeatur
 
 		file_put_contents($this->getCacheFilename(), json_encode($this->tokens));
 	}
+
+	public function getErc20Balance(string $contractAddress, string $holderAddress): ?Amount
+	{
+		return null;
+	}
 }
