@@ -202,6 +202,10 @@ class EthereumRpc extends EthereumBlockbook
 			return $data['result'] ?? [];
 		}
 
+		if (str_contains($data['message'], 'No transactions found')) {
+			return [];
+		}
+
 		throw new \Exception("Etherscan API error: " . $data['message']);
 	}
 
