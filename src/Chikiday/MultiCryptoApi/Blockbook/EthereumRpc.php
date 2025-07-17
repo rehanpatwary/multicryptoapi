@@ -96,7 +96,7 @@ class EthereumRpc extends EthereumBlockbook
 				$outputs[] = new TxvInOut(
 					$transferByLog->to,
 					"0",
-					hexdec($data['transactionIndex']),
+					hexdec($data['transactionIndex'] ?? "0x0"),
 					$_assets = [
 						$token->toAssetByLog($transferByLog),
 					],
@@ -106,7 +106,7 @@ class EthereumRpc extends EthereumBlockbook
 				$inputs[] = new TxvInOut(
 					$transferByLog->from,
 					"0",
-					hexdec($data['transactionIndex']),
+					hexdec($data['transactionIndex'] ?? "0x0"),
 					$_assets,
 					$log
 				);
