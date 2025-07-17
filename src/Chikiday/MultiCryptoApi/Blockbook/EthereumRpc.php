@@ -61,7 +61,7 @@ class EthereumRpc extends EthereumBlockbook
 		} else {
 			$method = 'eth_getBlockByHash';
 		}
-		$data = $this->jsonRpcWithRetry('', [$hash, true]);
+		$data = $this->jsonRpcWithRetry($method, [$hash, true]);
 
 		return new Block(
 			hexdec($data['number']),
