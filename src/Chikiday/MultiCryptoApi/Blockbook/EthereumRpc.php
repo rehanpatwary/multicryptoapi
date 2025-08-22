@@ -133,7 +133,7 @@ class EthereumRpc extends EthereumBlockbook
 
 		return new Transaction(
 			$txid,
-			hexdec($data['blockNumber']),
+			hexdec($data['blockNumber'] ?? '0x'),
 			0,
 			0,
 			$inputs,
